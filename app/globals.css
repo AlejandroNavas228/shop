@@ -1,0 +1,19 @@
+@import "tailwindcss";
+
+/* Esto asegura que aunque Tailwind falle, tu tienda se vea bien */
+body {
+  background-color: #f3f4f6;
+  color: #111827;
+  font-family: sans-serif;
+  margin: 0;
+  padding: 0;
+}
+
+button {
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+input {
+  color: black !important;
+}
