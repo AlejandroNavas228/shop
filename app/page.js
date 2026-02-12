@@ -3,75 +3,56 @@
 import React, { useState, useEffect } from 'react';
 import { createClient } from '@supabase/supabase-js';
 
-// --- CONFIGURACIÓN SEGURA ---
+// --- CONFIGURACIÓN ---
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 const ADMIN_PWD = process.env.NEXT_PUBLIC_ADMIN_PASSWORD; 
-const WHATSAPP_NUMBER = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || "584120000000";
+const WHATSAPP_NUMBER = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || "584142843660";
 
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-// --- CONFIGURACIÓN DE LA TIENDA ---
 const TIENDA_CONFIG = {
-  nombre: "Kestrel e-commerce",
+  nombre: "Kestrel",
   whatsapp: WHATSAPP_NUMBER,
   metodosPago: "Pago Móvil / Zelle / Binance"
 };
 
 export default function Home() {
-  // Estados de datos
   const [productos, setProductos] = useState([]);
   const [carrito, setCarrito] = useState([]);
-  
-  // Estados de Moneda (Base 385 Bs por defecto)
-  const [tasaCambio, setTasaCambio] = useState(385.00); 
+  const [tasaCambio, setTasaCambio] = useState(400.00); 
   const [moneda, setMoneda] = useState('USD'); 
-  
-  // Estados de interfaz
   const [esAdmin, setEsAdmin] = useState(false);
   const [cargando, setCargando] = useState(true);
   const [mostrarLogin, setMostrarLogin] = useState(false);
   const [mostrarCarrito, setMostrarCarrito] = useState(false);
   const [passInput, setPassInput] = useState("");
 
-  // Cargar productos y Tasa
   useEffect(() => {
     const inicializarTienda = async () => {
       try {
-        // 1. Cargar Productos
         let { data, error } = await supabase
           .from('camisetas')
           .select('*')
           .order('id', { ascending: false });
         if (!error && data) setProductos(data);
 
-        // 2. Intentar cargar Tasa de API (Si falla, se queda en 385)
         try {
             const res = await fetch('https://pydolarvenezuela-api.vercel.app/api/v1/dollar');
             const dataTasa = await res.json();
-            if (dataTasa?.monitors?.bcv?.price) {
-               setTasaCambio(dataTasa.monitors.bcv.price);
-            }
-        } catch (e) {
-            console.log("Usando tasa manual de respaldo:", 385);
-        }
-
-      } catch (err) {
-        console.error("Error general:", err);
-      } finally {
-        setCargando(false);
-      }
+            if (dataTasa?.monitors?.bcv?.price) setTasaCambio(dataTasa.monitors.bcv.price);
+        } catch (e) { console.log("Usando tasa respaldo"); }
+      } catch (err) { console.error(err); } 
+      finally { setCargando(false); }
     };
     inicializarTienda();
   }, []);
 
-  // --- FORMATO DE PRECIO ---
   const formatoPrecio = (precioUSD) => {
     if (moneda === 'USD') return `$${precioUSD}`;
     return `Bs ${(precioUSD * tasaCambio).toFixed(2)}`;
   };
 
-  // --- CARRITO ---
   const agregarAlCarrito = (producto) => setCarrito([...carrito, producto]);
   
   const eliminarDelCarrito = (index) => {
@@ -83,7 +64,6 @@ export default function Home() {
 
   const calcularTotal = () => carrito.reduce((acc, p) => acc + p.precio, 0);
 
-  // --- WHATSAPP ---
   const enviarPedidoWhatsApp = () => {
     if (carrito.length === 0) return;
     const totalUSD = calcularTotal();
@@ -97,15 +77,13 @@ ${lista}
 ---------------------------------
 💰 *TOTAL USD: $${totalUSD}*
 🇻🇪 *TOTAL BS: Bs ${totalBs}*
-(Tasa: ${tasaCambio} Bs/$)
+(Tasa: ${tasaCambio})
 
 📝 *Pago:* ${TIENDA_CONFIG.metodosPago}
     `.trim();
-
     window.open(`https://wa.me/${TIENDA_CONFIG.whatsapp}?text=${encodeURIComponent(mensaje)}`, '_blank');
   };
 
-  // --- ADMIN ---
   const intentarLogin = (e) => {
     e.preventDefault();
     if (passInput === ADMIN_PWD) {
@@ -120,13 +98,16 @@ ${lista}
   const agregarProducto = async () => {
     const n = document.getElementById('n-nom').value;
     const p = document.getElementById('n-pre').value;
-    const i = document.getElementById('n-img').value;
+    const i = document.getElementById('n-img').value; // Ahora recibe varios links
     
     if(!n || !p) return alert("Faltan datos");
 
+    // Convertimos el texto de links (separados por coma) en un Array
+    const arrayImagenes = i.split(',').map(url => url.trim()).filter(url => url.length > 0);
+
     const { data, error } = await supabase
       .from('camisetas')
-      .insert([{ nombre: n, precio: parseInt(p), imagen_url: i, stock: true }])
+      .insert([{ nombre: n, precio: parseInt(p), imagenes: arrayImagenes, stock: true }])
       .select();
       
     if (!error && data) {
@@ -134,7 +115,7 @@ ${lista}
       document.getElementById('n-nom').value = "";
       document.getElementById('n-pre').value = "";
       document.getElementById('n-img').value = "";
-      alert("✅ Producto agregado");
+      alert("✅ Producto agregado con galería");
     } else {
       alert("Error: " + error.message);
     }
@@ -158,26 +139,17 @@ ${lista}
           <h1 className="text-lg font-black tracking-tighter italic uppercase">{TIENDA_CONFIG.nombre}</h1>
           <p className="text-[10px] text-gray-400">Envíos a todo el país 🇻🇪</p>
         </div>
-        
         <div className="flex items-center gap-2">
-          {/* Switch Moneda */}
-          <button 
-            onClick={() => setMoneda(moneda === 'USD' ? 'VES' : 'USD')}
-            className="bg-gray-800 px-3 py-1 rounded-full text-xs font-bold border border-gray-600 flex items-center gap-2 active:scale-95 transition-transform"
-          >
+          <button onClick={() => setMoneda(moneda === 'USD' ? 'VES' : 'USD')} className="bg-gray-800 px-3 py-1 rounded-full text-xs font-bold border border-gray-600 flex items-center gap-2">
             <span>{moneda === 'USD' ? '🇺🇸 $' : '🇻🇪 Bs'}</span>
           </button>
-
-          <button 
-            onClick={esAdmin ? () => setEsAdmin(false) : () => setMostrarLogin(true)} 
-            className={`text-[10px] px-3 py-1 rounded-full border transition-all ${esAdmin ? 'bg-red-500 border-red-500 font-bold' : 'border-gray-600 text-gray-400'}`}
-          >
+          <button onClick={esAdmin ? () => setEsAdmin(false) : () => setMostrarLogin(true)} className={`text-[10px] px-3 py-1 rounded-full border transition-all ${esAdmin ? 'bg-red-500 border-red-500 font-bold' : 'border-gray-600 text-gray-400'}`}>
             {esAdmin ? 'SALIR' : 'LOGIN'}
           </button>
         </div>
       </header>
 
-      {/* LOGIN MODAL */}
+      {/* LOGIN */}
       {mostrarLogin && (
         <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in">
           <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-2xl">
@@ -193,51 +165,60 @@ ${lista}
         </div>
       )}
 
-      {/* PANEL ADMIN + CONTROL TASA */}
+      {/* ADMIN PANEL */}
       {esAdmin && (
         <div className="m-4 space-y-4 animate-slide-down">
-          
-          {/* CONTROL DE TASA MANUAL */}
           <div className="bg-yellow-50 border border-yellow-200 p-4 rounded-xl flex justify-between items-center">
-            <div>
-                <p className="text-xs font-bold text-yellow-800 uppercase">Tasa del día (Bs/$)</p>
-                <p className="text-[10px] text-yellow-600">Edita si la API falla</p>
-            </div>
-            <input 
-                type="number" 
-                value={tasaCambio} 
-                onChange={(e) => setTasaCambio(parseFloat(e.target.value))}
-                className="w-24 p-2 text-xl font-black text-right bg-white border border-yellow-300 rounded-lg outline-none focus:ring-2 focus:ring-yellow-500"
-            />
+            <div><p className="text-xs font-bold text-yellow-800 uppercase">Tasa (Bs/$)</p></div>
+            <input type="number" value={tasaCambio} onChange={(e) => setTasaCambio(parseFloat(e.target.value))} className="w-24 p-2 text-xl font-black text-right bg-white border border-yellow-300 rounded-lg outline-none" />
           </div>
 
-          {/* AGREGAR PRODUCTO */}
           <div className="p-6 bg-white rounded-2xl border-2 border-blue-500 shadow-xl">
             <h3 className="font-bold mb-4 text-blue-600 uppercase text-sm">✨ Nuevo Producto</h3>
             <div className="space-y-3">
               <input id="n-nom" placeholder="Nombre" className="w-full p-3 bg-gray-50 border rounded-xl text-sm outline-none focus:border-blue-500" />
               <div className="flex gap-2">
                   <input id="n-pre" type="number" placeholder="Precio ($)" className="w-1/3 p-3 bg-gray-50 border rounded-xl text-sm outline-none focus:border-blue-500" />
-                  <input id="n-img" placeholder="URL Imagen" className="w-2/3 p-3 bg-gray-50 border rounded-xl text-sm outline-none focus:border-blue-500" />
+                  {/* INPUT ACTUALIZADO PARA VARIAS FOTOS */}
+                  <input id="n-img" placeholder="Links de imágenes (separados por coma)" className="w-2/3 p-3 bg-gray-50 border rounded-xl text-sm outline-none focus:border-blue-500" />
               </div>
+              <p className="text-[10px] text-gray-400">Ejemplo: link1.jpg, link2.jpg</p>
               <button onClick={agregarProducto} className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold text-sm shadow-md active:scale-95 transition-all">+ PUBLICAR</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* GRID PRODUCTOS */}
+      {/* GRID PRODUCTOS (CON CARRUSEL) */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 p-4 pt-2">
         {productos.map((prod) => (
-          <div key={prod.id} className="bg-white rounded-xl shadow-sm overflow-hidden flex flex-col border border-gray-100">
-            <div className="relative aspect-square bg-gray-100">
-              {prod.imagen_url ? <img src={prod.imagen_url} className="w-full h-full object-cover" /> : <div className="flex h-full items-center justify-center text-xs text-gray-400">Sin foto</div>}
-              {esAdmin && (
-                <button onClick={() => eliminarProductoDB(prod.id)} className="absolute top-2 right-2 bg-red-500 text-white rounded-full w-8 h-8 flex items-center justify-center shadow-md">
-                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                </button>
+          <div key={prod.id} className="bg-white rounded-xl shadow-sm overflow-hidden flex flex-col border border-gray-100 relative group">
+            
+            {/* CARRUSEL DE IMÁGENES (SCROLL HORIZONTAL) */}
+            <div className="relative aspect-square bg-gray-100 overflow-x-auto snap-x snap-mandatory flex scrollbar-hide">
+              {prod.imagenes && prod.imagenes.length > 0 ? (
+                prod.imagenes.map((img, idx) => (
+                  <img key={idx} src={img} className="w-full h-full object-cover flex-shrink-0 snap-center" />
+                ))
+              ) : (
+                <div className="flex w-full h-full items-center justify-center text-xs text-gray-400">Sin foto</div>
+              )}
+
+              {/* Indicador de "Desliza" si hay más de 1 foto */}
+              {prod.imagenes && prod.imagenes.length > 1 && (
+                <div className="absolute bottom-2 right-2 bg-black/50 text-white text-[10px] px-2 py-0.5 rounded-full backdrop-blur-sm">
+                  +{prod.imagenes.length - 1} fotos
+                </div>
               )}
             </div>
+
+            {/* BOTÓN ELIMINAR (ADMIN) */}
+            {esAdmin && (
+              <button onClick={() => eliminarProductoDB(prod.id)} className="absolute top-2 right-2 bg-red-500 text-white rounded-full w-8 h-8 flex items-center justify-center shadow-md z-10">
+                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+              </button>
+            )}
+
             <div className="p-4 flex flex-col flex-grow">
               <h2 className="text-xs font-bold text-gray-700 uppercase line-clamp-2">{prod.nombre}</h2>
               <div className="flex justify-between items-end mt-3">
@@ -278,7 +259,8 @@ ${lista}
               {carrito.map((prod, index) => (
                 <div key={index} className="flex justify-between items-center bg-gray-50 p-3 rounded-xl border border-gray-100">
                   <div className="flex items-center gap-3">
-                    {prod.imagen_url && <img src={prod.imagen_url} className="w-10 h-10 rounded-md object-cover" />}
+                    {/* FOTO MINIATURA EN EL CARRITO (Solo mostramos la primera) */}
+                    {prod.imagenes && prod.imagenes[0] && <img src={prod.imagenes[0]} className="w-10 h-10 rounded-md object-cover" />}
                     <div>
                         <p className="text-xs font-bold text-gray-800 line-clamp-1">{prod.nombre}</p>
                         <p className="text-sm font-black text-blue-600">{formatoPrecio(prod.precio)}</p>
