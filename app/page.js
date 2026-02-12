@@ -1,18 +1,15 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { createClient } from '@supabase/supabase-js';
+// Importamos nuestras nuevas piezas "Lego"
+import { supabase } from '@/lib/supabase'; 
+import Navbar from '@/components/Navbar';
 
-// --- CONFIGURACIÓN ---
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 const ADMIN_PWD = process.env.NEXT_PUBLIC_ADMIN_PASSWORD; 
-const WHATSAPP_NUMBER = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || "584142843660";
-
-const supabase = createClient(supabaseUrl, supabaseKey);
+const WHATSAPP_NUMBER = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || "584120000000";
 
 const TIENDA_CONFIG = {
-  nombre: "Kestrel",
+  nombre: "FUTBOL STORE CCS",
   whatsapp: WHATSAPP_NUMBER,
   metodosPago: "Pago Móvil / Zelle / Binance"
 };
@@ -20,7 +17,7 @@ const TIENDA_CONFIG = {
 export default function Home() {
   const [productos, setProductos] = useState([]);
   const [carrito, setCarrito] = useState([]);
-  const [tasaCambio, setTasaCambio] = useState(400.00); 
+  const [tasaCambio, setTasaCambio] = useState(385.00); 
   const [moneda, setMoneda] = useState('USD'); 
   const [esAdmin, setEsAdmin] = useState(false);
   const [cargando, setCargando] = useState(true);
@@ -31,11 +28,8 @@ export default function Home() {
   useEffect(() => {
     const inicializarTienda = async () => {
       try {
-        let { data, error } = await supabase
-          .from('camisetas')
-          .select('*')
-          .order('id', { ascending: false });
-        if (!error && data) setProductos(data);
+        let { data } = await supabase.from('camisetas').select('*').order('id', { ascending: false });
+        if (data) setProductos(data);
 
         try {
             const res = await fetch('https://pydolarvenezuela-api.vercel.app/api/v1/dollar');
@@ -70,20 +64,11 @@ export default function Home() {
     const totalBs = (totalUSD * tasaCambio).toFixed(2);
     const lista = carrito.map(p => `▪️ ${p.nombre} ($${p.precio})`).join('\n');
 
-    const mensaje = `
-*PEDIDO WEB - ${TIENDA_CONFIG.nombre}* 🛍️
----------------------------------
-${lista}
----------------------------------
-💰 *TOTAL USD: $${totalUSD}*
-🇻🇪 *TOTAL BS: Bs ${totalBs}*
-(Tasa: ${tasaCambio})
-
-📝 *Pago:* ${TIENDA_CONFIG.metodosPago}
-    `.trim();
+    const mensaje = `*PEDIDO WEB* 🛍️\n----------------\n${lista}\n----------------\n💰 Total: $${totalUSD} / Bs ${totalBs}\n(Tasa: ${tasaCambio})`;
     window.open(`https://wa.me/${TIENDA_CONFIG.whatsapp}?text=${encodeURIComponent(mensaje)}`, '_blank');
   };
 
+  // --- LOGICA ADMIN ---
   const intentarLogin = (e) => {
     e.preventDefault();
     if (passInput === ADMIN_PWD) {
@@ -95,194 +80,109 @@ ${lista}
     }
   };
 
-  const agregarProducto = async () => {
-    const n = document.getElementById('n-nom').value;
-    const p = document.getElementById('n-pre').value;
-    const i = document.getElementById('n-img').value; // Ahora recibe varios links
-    
-    if(!n || !p) return alert("Faltan datos");
-
-    // Convertimos el texto de links (separados por coma) en un Array
-    const arrayImagenes = i.split(',').map(url => url.trim()).filter(url => url.length > 0);
-
-    const { data, error } = await supabase
-      .from('camisetas')
-      .insert([{ nombre: n, precio: parseInt(p), imagenes: arrayImagenes, stock: true }])
-      .select();
-      
-    if (!error && data) {
-      setProductos([data[0], ...productos]);
-      document.getElementById('n-nom').value = "";
-      document.getElementById('n-pre').value = "";
-      document.getElementById('n-img').value = "";
-      alert("✅ Producto agregado con galería");
-    } else {
-      alert("Error: " + error.message);
-    }
-  };
-
-  const eliminarProductoDB = async (id) => {
-    if (confirm("¿Borrar permanentemente?")) {
-      const { error } = await supabase.from('camisetas').delete().eq('id', id);
-      if (!error) setProductos(productos.filter(p => p.id !== id));
-    }
-  };
-
-  if (cargando) return <div className="flex h-screen items-center justify-center font-bold animate-pulse text-blue-600">Cargando Tienda...</div>;
+  // --- RENDERIZADO ---
+  if (cargando) return <div className="flex h-screen items-center justify-center font-serif italic">Cargando...</div>;
 
   return (
-    <div className="max-w-7xl mx-auto bg-gray-50 min-h-screen pb-32 font-sans text-gray-900 relative">
+    <div className="bg-gray-50 min-h-screen pb-32 font-sans text-gray-900 relative">
       
-      {/* HEADER */}
-      <header className="bg-black text-white p-4 sticky top-0 z-40 flex justify-between items-center shadow-lg">
-        <div>
-          <h1 className="text-lg font-black tracking-tighter italic uppercase">{TIENDA_CONFIG.nombre}</h1>
-          <p className="text-[10px] text-gray-400">Envíos a todo el país 🇻🇪</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <button onClick={() => setMoneda(moneda === 'USD' ? 'VES' : 'USD')} className="bg-gray-800 px-3 py-1 rounded-full text-xs font-bold border border-gray-600 flex items-center gap-2">
-            <span>{moneda === 'USD' ? '🇺🇸 $' : '🇻🇪 Bs'}</span>
-          </button>
-          <button onClick={esAdmin ? () => setEsAdmin(false) : () => setMostrarLogin(true)} className={`text-[10px] px-3 py-1 rounded-full border transition-all ${esAdmin ? 'bg-red-500 border-red-500 font-bold' : 'border-gray-600 text-gray-400'}`}>
-            {esAdmin ? 'SALIR' : 'LOGIN'}
-          </button>
-        </div>
-      </header>
+      {/* 1. USAMOS EL COMPONENTE NAVBAR */}
+      <Navbar 
+        nombreTienda={TIENDA_CONFIG.nombre}
+        carritoCount={carrito.length}
+        toggleCarrito={() => setMostrarCarrito(true)}
+        moneda={moneda}
+        toggleMoneda={() => setMoneda(moneda === 'USD' ? 'VES' : 'USD')}
+        tasa={tasaCambio}
+        esAdmin={esAdmin}
+        toggleAdmin={esAdmin ? () => setEsAdmin(false) : () => setMostrarLogin(true)}
+      />
 
-      {/* LOGIN */}
+      {/* LOGIN MODAL */}
       {mostrarLogin && (
-        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in">
-          <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-2xl">
-            <h3 className="text-xl font-bold text-center">Admin Login</h3>
-            <form onSubmit={intentarLogin} className="space-y-4 mt-4">
-              <input type="password" placeholder="Contraseña" value={passInput} onChange={(e) => setPassInput(e.target.value)} className="w-full p-3 bg-gray-100 rounded-xl text-center outline-none focus:ring-2 focus:ring-black" autoFocus />
-              <div className="flex gap-2">
-                <button type="button" onClick={() => setMostrarLogin(false)} className="flex-1 py-3 rounded-xl font-bold text-gray-500 bg-gray-100">Cancelar</button>
-                <button type="submit" className="flex-1 bg-black text-white py-3 rounded-xl font-bold">Entrar</button>
-              </div>
+        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl p-8 w-full max-w-sm shadow-2xl">
+            <h3 className="text-2xl font-serif font-bold text-center mb-6">Acceso Admin</h3>
+            <form onSubmit={intentarLogin} className="space-y-4">
+              <input type="password" placeholder="Contraseña" value={passInput} onChange={(e) => setPassInput(e.target.value)} className="w-full p-4 bg-gray-50 rounded-xl text-center outline-none border focus:border-black transition-colors" autoFocus />
+              <button type="submit" className="w-full bg-black text-white py-4 rounded-xl font-bold hover:opacity-90">Entrar</button>
+              <button type="button" onClick={() => setMostrarLogin(false)} className="w-full text-gray-400 text-sm hover:text-black">Cancelar</button>
             </form>
           </div>
         </div>
       )}
 
-      {/* ADMIN PANEL */}
-      {esAdmin && (
-        <div className="m-4 space-y-4 animate-slide-down">
-          <div className="bg-yellow-50 border border-yellow-200 p-4 rounded-xl flex justify-between items-center">
-            <div><p className="text-xs font-bold text-yellow-800 uppercase">Tasa (Bs/$)</p></div>
-            <input type="number" value={tasaCambio} onChange={(e) => setTasaCambio(parseFloat(e.target.value))} className="w-24 p-2 text-xl font-black text-right bg-white border border-yellow-300 rounded-lg outline-none" />
-          </div>
-
-          <div className="p-6 bg-white rounded-2xl border-2 border-blue-500 shadow-xl">
-            <h3 className="font-bold mb-4 text-blue-600 uppercase text-sm">✨ Nuevo Producto</h3>
-            <div className="space-y-3">
-              <input id="n-nom" placeholder="Nombre" className="w-full p-3 bg-gray-50 border rounded-xl text-sm outline-none focus:border-blue-500" />
-              <div className="flex gap-2">
-                  <input id="n-pre" type="number" placeholder="Precio ($)" className="w-1/3 p-3 bg-gray-50 border rounded-xl text-sm outline-none focus:border-blue-500" />
-                  {/* INPUT ACTUALIZADO PARA VARIAS FOTOS */}
-                  <input id="n-img" placeholder="Links de imágenes (separados por coma)" className="w-2/3 p-3 bg-gray-50 border rounded-xl text-sm outline-none focus:border-blue-500" />
-              </div>
-              <p className="text-[10px] text-gray-400">Ejemplo: link1.jpg, link2.jpg</p>
-              <button onClick={agregarProducto} className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold text-sm shadow-md active:scale-95 transition-all">+ PUBLICAR</button>
-            </div>
-          </div>
+      {/* --- AQUÍ VA EL CONTENIDO PRINCIPAL --- */}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        
+        {/* Banner Temporal (Pronto haremos un componente Hero aquí) */}
+        <div className="mb-12 text-center py-16 bg-white rounded-3xl shadow-sm border border-gray-100">
+           <h2 className="text-4xl md:text-5xl font-serif font-bold text-gray-900 mb-4">Nueva Colección 2026</h2>
+           <p className="text-gray-500 max-w-md mx-auto">La mejor indumentaria deportiva con calidad internacional y envíos a todo el país.</p>
         </div>
-      )}
 
-      {/* GRID PRODUCTOS (CON CARRUSEL) */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 p-4 pt-2">
-        {productos.map((prod) => (
-          <div key={prod.id} className="bg-white rounded-xl shadow-sm overflow-hidden flex flex-col border border-gray-100 relative group">
-            
-            {/* CARRUSEL DE IMÁGENES (SCROLL HORIZONTAL) */}
-            <div className="relative aspect-square bg-gray-100 overflow-x-auto snap-x snap-mandatory flex scrollbar-hide">
-              {prod.imagenes && prod.imagenes.length > 0 ? (
-                prod.imagenes.map((img, idx) => (
-                  <img key={idx} src={img} className="w-full h-full object-cover flex-shrink-0 snap-center" />
-                ))
-              ) : (
-                <div className="flex w-full h-full items-center justify-center text-xs text-gray-400">Sin foto</div>
-              )}
-
-              {/* Indicador de "Desliza" si hay más de 1 foto */}
-              {prod.imagenes && prod.imagenes.length > 1 && (
-                <div className="absolute bottom-2 right-2 bg-black/50 text-white text-[10px] px-2 py-0.5 rounded-full backdrop-blur-sm">
-                  +{prod.imagenes.length - 1} fotos
-                </div>
-              )}
-            </div>
-
-            {/* BOTÓN ELIMINAR (ADMIN) */}
-            {esAdmin && (
-              <button onClick={() => eliminarProductoDB(prod.id)} className="absolute top-2 right-2 bg-red-500 text-white rounded-full w-8 h-8 flex items-center justify-center shadow-md z-10">
-                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-              </button>
-            )}
-
-            <div className="p-4 flex flex-col flex-grow">
-              <h2 className="text-xs font-bold text-gray-700 uppercase line-clamp-2">{prod.nombre}</h2>
-              <div className="flex justify-between items-end mt-3">
-                <p className="text-xl font-black text-gray-900">{formatoPrecio(prod.precio)}</p>
-                {!esAdmin && (
-                   <button onClick={() => agregarAlCarrito(prod)} className="bg-black text-white text-[10px] px-4 py-2 rounded-lg font-bold uppercase shadow-sm active:scale-95">Agregar</button>
+        {/* Grid de Productos */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+          {productos.map((prod) => (
+            <div key={prod.id} className="group bg-white rounded-xl overflow-hidden hover:shadow-xl transition-all duration-300 cursor-pointer">
+              <div className="relative aspect-[4/5] bg-gray-100 overflow-hidden">
+                {prod.imagenes && prod.imagenes[0] ? (
+                  <img src={prod.imagenes[0]} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
+                ) : (
+                  <div className="flex h-full items-center justify-center text-gray-300">Sin imagen</div>
                 )}
+                <button onClick={() => agregarAlCarrito(prod)} className="absolute bottom-4 right-4 bg-white text-black h-10 w-10 rounded-full flex items-center justify-center shadow-lg translate-y-12 group-hover:translate-y-0 transition-transform duration-300 hover:bg-black hover:text-white">
+                  +
+                </button>
+              </div>
+              <div className="p-4">
+                <h3 className="text-sm font-medium text-gray-900">{prod.nombre}</h3>
+                <p className="mt-1 text-lg font-bold text-gray-900 font-serif">{formatoPrecio(prod.precio)}</p>
               </div>
             </div>
-          </div>
-        ))}
-      </div>
-
-      {/* BARRA FLOTANTE */}
-      {!esAdmin && carrito.length > 0 && !mostrarCarrito && (
-        <div onClick={() => setMostrarCarrito(true)} className="fixed bottom-4 left-4 right-4 md:left-auto md:right-8 md:w-96 bg-gray-900 text-white p-4 rounded-2xl shadow-2xl flex justify-between items-center z-40 cursor-pointer animate-bounce-in">
-          <div>
-            <span className="text-[10px] text-gray-400 uppercase font-bold">Total estimado</span>
-            <div className="flex items-baseline gap-2">
-              <span className="font-black text-2xl">{formatoPrecio(calcularTotal())}</span>
-              <span className="text-xs bg-white text-black px-2 py-0.5 rounded-full font-bold">{carrito.length} items</span>
-            </div>
-          </div>
-          <button className="bg-white text-black px-6 py-3 rounded-xl font-bold text-sm">VER CARRITO 🛒</button>
+          ))}
         </div>
-      )}
 
-      {/* MODAL CARRITO */}
+      </main>
+
+      {/* MODAL CARRITO SIMPLIFICADO */}
       {mostrarCarrito && (
-        <div className="fixed inset-0 bg-black/60 z-50 flex items-end md:items-center justify-center backdrop-blur-sm animate-fade-in">
-          <div onClick={() => setMostrarCarrito(false)} className="absolute inset-0"></div>
-          <div className="bg-white w-full md:max-w-md rounded-t-2xl md:rounded-2xl p-6 shadow-2xl relative z-10 max-h-[85vh] flex flex-col animate-slide-up">
-            <div className="flex justify-between items-center mb-4 border-b pb-4">
-              <h3 className="text-xl font-black italic uppercase">Tu Pedido</h3>
-              <button onClick={() => setMostrarCarrito(false)} className="bg-gray-100 p-2 rounded-full"><svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg></button>
-            </div>
-            <div className="flex-1 overflow-y-auto space-y-3 mb-4 pr-1">
-              {carrito.map((prod, index) => (
-                <div key={index} className="flex justify-between items-center bg-gray-50 p-3 rounded-xl border border-gray-100">
-                  <div className="flex items-center gap-3">
-                    {/* FOTO MINIATURA EN EL CARRITO (Solo mostramos la primera) */}
-                    {prod.imagenes && prod.imagenes[0] && <img src={prod.imagenes[0]} className="w-10 h-10 rounded-md object-cover" />}
-                    <div>
-                        <p className="text-xs font-bold text-gray-800 line-clamp-1">{prod.nombre}</p>
-                        <p className="text-sm font-black text-blue-600">{formatoPrecio(prod.precio)}</p>
-                    </div>
-                  </div>
-                  <button onClick={() => eliminarDelCarrito(index)} className="text-red-400 bg-red-50 p-2 rounded-lg"><svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
-                </div>
-              ))}
-            </div>
-            <div className="border-t pt-4">
-              <div className="flex justify-between items-center mb-4">
-                <span className="text-gray-500 font-medium">Total:</span>
-                <span className="text-3xl font-black">{formatoPrecio(calcularTotal())}</span>
+        <div className="fixed inset-0 z-50 flex justify-end">
+           <div className="fixed inset-0 bg-black/20 backdrop-blur-sm" onClick={() => setMostrarCarrito(false)}></div>
+           <div className="bg-white w-full max-w-md h-full relative z-10 shadow-2xl p-6 flex flex-col animate-slide-left">
+              <div className="flex justify-between items-center mb-6">
+                 <h2 className="text-2xl font-serif font-bold">Tu Carrito ({carrito.length})</h2>
+                 <button onClick={() => setMostrarCarrito(false)} className="text-gray-400 hover:text-black">✕</button>
               </div>
-              <button onClick={enviarPedidoWhatsApp} className="w-full bg-green-500 text-white py-4 rounded-xl font-bold text-lg shadow-lg active:scale-95 transition-all flex justify-center items-center gap-2">
-                <span>COMPLETAR EN WHATSAPP</span>
-                <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981zm11.387-5.464c-.074-.124-.272-.198-.57-.347-.297-.149-1.758-.868-2.031-.967-.272-.099-.47-.149-.669.149-.198.297-.768.967-.941 1.165-.173.198-.347.223-.644.074-.297-.149-1.255-.462-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.521.151-.172.2-.296.3-.495.099-.198.05-.372-.025-.521-.075-.148-.669-1.611-.916-2.206-.242-.579-.487-.501-.669-.51l-.57-.01c-.198 0-.52.074-.792.372s-1.04 1.016-1.04 2.479 1.065 2.876 1.213 3.074c.149.198 2.095 3.2 5.076 4.487.709.306 1.263.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.695.248-1.29.173-1.414z"/></svg>
-              </button>
-            </div>
-          </div>
+              
+              <div className="flex-1 overflow-y-auto space-y-6">
+                {carrito.map((p, i) => (
+                   <div key={i} className="flex gap-4">
+                      <div className="h-20 w-20 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
+                         {p.imagenes && <img src={p.imagenes[0]} className="w-full h-full object-cover"/>}
+                      </div>
+                      <div className="flex-1 flex flex-col justify-center">
+                         <h4 className="font-medium text-gray-900">{p.nombre}</h4>
+                         <p className="text-gray-500 text-sm">{formatoPrecio(p.precio)}</p>
+                      </div>
+                      <button onClick={() => eliminarDelCarrito(i)} className="text-red-400 text-sm hover:text-red-600">Eliminar</button>
+                   </div>
+                ))}
+              </div>
+
+              <div className="border-t pt-6 mt-6">
+                 <div className="flex justify-between text-xl font-bold mb-6">
+                    <span>Total</span>
+                    <span>{formatoPrecio(calcularTotal())}</span>
+                 </div>
+                 <button onClick={enviarPedidoWhatsApp} className="w-full bg-black text-white py-4 rounded-xl font-bold hover:opacity-90 transition-opacity">
+                    Completar Pedido en WhatsApp
+                 </button>
+              </div>
+           </div>
         </div>
       )}
+
     </div>
   );
 }
