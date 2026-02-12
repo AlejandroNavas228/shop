@@ -1,12 +1,10 @@
 'use client';
 
-// --- IMPORTACIONES CORREGIDAS ---
-// Usamos '../' para salir de la carpeta 'app' y buscar en la raiz
-import { supabase } from '../lib/supabase'; 
+// Usamos '..' para subir un nivel (salir de 'app')
+import { supabase } from '../lib/supabase';
 import Navbar from '../components/Navbar';
 import Hero from '../components/Hero';
 import ProductCard from '../components/ProductCard';
-
 const ADMIN_PWD = process.env.NEXT_PUBLIC_ADMIN_PASSWORD; 
 const WHATSAPP_NUMBER = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || "584120000000";
 
